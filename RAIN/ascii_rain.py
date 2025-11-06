@@ -10,14 +10,14 @@ import os
 
 class Drop :
     def __init__(self) :
-        rows, cols = shutil.get_terminal_size()
+        self.rows, self.cols = shutil.get_terminal_size()
 
         self.drop = "." 
-        self.x = random.randrange(0, rows, 1)
-        self.y = random.randrange(0, cols, 1)
-        self.y_speed = random.randrange(1, 2, 1)
+        self.x = random.randrange(0, self.rows, 1)
+        self.y = random.randrange(0, self.cols, 1)
+        self.y_speed = random.randrange(1, 3, 1)
         self.start_time = time.time()
-        self.speed = 0.001
+        self.speed = 0.0006
 
 
     def move(self) :
@@ -29,12 +29,12 @@ class Drop :
         sys.stdout.write(f"\x1b[{self.y};{self.x}H" + self.drop) #move down one line
         sys.stdout.write(f"\x1b[{prev_y};{prev_x}H" + self.drop) 
     
-        if(self.y < 40) :
+        if(self.y < self.cols) :
             self.y = self.y + self.y_speed
         else :
             self.y = 0
         
-        if(self.x < 120) :
+        if(self.x < self.rows) :
             self.x = self.x + 1
         else :
             self.x = 0
@@ -68,7 +68,7 @@ if __name__ == "__main__" :
 
     #make one instance of the drop
     instances = []
-    for i in range (40) :
+    for i in range (60) :
         instances.append(Drop())
 
     # input_thread = threading.Thread(target=user_input, args=(close_flag,))
