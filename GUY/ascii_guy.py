@@ -9,7 +9,7 @@ import queue
 import tty, sys, termios
 
 
-FRAMERATE = 1/24
+FRAMERATE = 1/32
 cols, rows = os.get_terminal_size()
 
 
@@ -46,7 +46,7 @@ class Guy :
     def __init__(self) :
         self.x = cols//2
         self.y = rows-1
-        self.moveAmt = 3
+        self.moveAmt = 1
     
     def display(self, buff) :
         buff[self.y][self.x] = "&"
@@ -124,6 +124,9 @@ if __name__ == "__main__" :
             i.move(frame_buffer)
         g.display(frame_buffer)
 
+        L = f"Length of Instances : {len(instances)}"
+        for s, l in zip(L, range(len(L))) :
+            frame_buffer[1][l+3] = s
 
         #print the buffer frame
         for y in range(len(frame_buffer)) :
@@ -131,13 +134,10 @@ if __name__ == "__main__" :
                 sys.stdout.write(f"\x1b[{y};{x}H" + frame_buffer[y][x])
 
         #where to write stuff directly to screen
-        sys.stdout.write("\x1b[H" + f"Length of Instances : {len(instances)}")
-        if th.is_alive :
-            sys.stdout.write("\x1b[3;0H" + "Thread still running")
+        #sys.stdout.write("\x1b[H" + f"Length of Instances : {len(instances)}")
         
         #check for user input events
         if not q.empty() :
-            sys.stdout.write("\x1b[6;0H" + "Something in Queue")
             k = q.get()
             if k == 'q' :
                 close_flag = True
@@ -152,7 +152,10 @@ if __name__ == "__main__" :
         
         if(close_flag == True) :
             break
-    
+   
+    #clear terminal when done
+    sys.stdout.write("\x1b[2J\x1b[H")
+
 
     
     
