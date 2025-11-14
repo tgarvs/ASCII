@@ -59,7 +59,7 @@ class Guy :
                 self.x = 1
         
         if c == 'a' :
-            if self.x < 0 + self.moveAmt :
+            if self.x > 0 + self.moveAmt :
                 self.x = self.x - self.moveAmt
             else :
                 self.x = cols - self.moveAmt
