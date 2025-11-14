@@ -8,7 +8,7 @@ import os
 import queue
 import tty, sys, termios
 
-#TODO: allow user input and resizing
+
 FRAMERATE = 1/24
 cols, rows = os.get_terminal_size()
 
@@ -41,43 +41,47 @@ class Drop :
         buff[self.y][self.x] = self.drop
         buff[prev_y][prev_x] = self.drop
 
-
-
     
 class Guy :
     def __init__(self) :
-        self.x = 10
-        self.y = 10
+        self.x = cols//2
+        self.y = rows-1
+        self.moveAmt = 3
     
     def display(self, buff) :
         buff[self.y][self.x] = "&"
 
     def move(self, c: str) :
         if c == 'd' :
-            self.x = self.x + 10
+            if self.x < cols - self.moveAmt :
+                self.x = self.x + self.moveAmt
+            else :
+                self.x = 1
+        
+        if c == 'a' :
+            if self.x < 0 + self.moveAmt :
+                self.x = self.x - self.moveAmt
+            else :
+                self.x = cols - self.moveAmt
 
 
 
-    
-# def listener(in_q) :
-#     for line in sys.stdin :
-#         in_q.put(line.rstrip('\n'))
+
 
 #Stole and modified this code from here: https://code.activestate.com/recipes/134892/
-class _GetchUnix:
-    def __init__(self):
-        pass
-
-    def __call__(self, in_q):
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
+def listener(in_q):
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try :
+        while True :
             tty.setraw(sys.stdin.fileno())
             ch = sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        
-        in_q.put(ch)
+            if not ch :
+                continue
+            in_q.put(ch)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    
     
 
 
@@ -99,27 +103,15 @@ if __name__ == "__main__" :
 
 
     g = Guy()
-    listener = _GetchUnix()
+
     q = queue.Queue()
-    th = threading.Thread(target=listener.__call__, args=(q,), daemon=True)
+    th = threading.Thread(target=listener, args=(q,), daemon=True)
     th.start()
     frame_buffer = [[" "]*cols for _ in range(rows)] #needs space to actually clear it
  
 
 
     while True:
-
-        #check for user input events
-        if not q.empty() :
-            
-            k = q.get()
-            if k == 'q' :
-                close_flag = True
-            
-            g.move(k)
-                
-
-
 
         #clear render buffer
         for y in range(len(frame_buffer)) :
@@ -140,6 +132,19 @@ if __name__ == "__main__" :
 
         #where to write stuff directly to screen
         sys.stdout.write("\x1b[H" + f"Length of Instances : {len(instances)}")
+        if th.is_alive :
+            sys.stdout.write("\x1b[3;0H" + "Thread still running")
+        
+        #check for user input events
+        if not q.empty() :
+            sys.stdout.write("\x1b[6;0H" + "Something in Queue")
+            k = q.get()
+            if k == 'q' :
+                close_flag = True
+            
+            elif k == 'd' or k == 'a' :
+                g.move(k)
+
 
         #push out frame and pause for a frame
         sys.stdout.flush()
