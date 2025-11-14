@@ -6,63 +6,78 @@ import threading
 import shutil
 import os
 import queue
+import tty, sys, termios
 
 #TODO: allow user input and resizing
+FRAMERATE = 1/24
+cols, rows = os.get_terminal_size()
+
 
 class Drop :
     def __init__(self) :
-        self.rows, self.cols = shutil.get_terminal_size()
-
         self.drop = "." 
-        self.x = random.randrange(0, self.rows, 1)
-        self.y = random.randrange(0, self.cols, 1)
+        self.x = random.randrange(0, cols, 1)
+        self.y = random.randrange(0, rows, 1)
         self.y_speed = random.randrange(1, 3, 1)
-        self.start_time = time.time()
-        self.speed = 0.0006
+        self.x_speed = 1
 
 
-    def move(self) :
-        time.sleep(self.speed) #speed at which it moves
+    def move(self, buff) :
+        prev_y = self.y - self.y_speed
+        prev_x = self.x - self.x_speed
 
-        prev_y = self.y - self.y_speed - 0
-        prev_x = self.x - 1
 
-        sys.stdout.write(f"\x1b[{self.y};{self.x}H" + self.drop) #move down one line
-        sys.stdout.write(f"\x1b[{prev_y};{prev_x}H" + self.drop) 
-    
-        if(self.y < self.cols) :
+        if(self.y < len(buff) - self.y_speed) :
             self.y = self.y + self.y_speed
         else :
             self.y = 0
         
-        if(self.x < self.rows) :
-            self.x = self.x + 1
+        if(self.x < len(buff[0]) - self.x_speed) :
+            self.x = self.x + self.x_speed
         else :
             self.x = 0
 
 
-        
-        
+        buff[self.y][self.x] = self.drop
+        buff[prev_y][prev_x] = self.drop
+
+
+
+    
 class Guy :
     def __init__(self) :
         self.x = 10
-        self.y = 0
+        self.y = 10
     
-    def display(self) :
-        sys.stdout.write(f"\x1b[{self.y};{self.x}H" + "&") 
-        sys.stdout.flush()
-
+    def display(self, buff) :
+        buff[self.y][self.x] = "&"
 
     def move(self, c: str) :
-        print("GUY MOVE CALLED")
         if c == 'd' :
             self.x = self.x + 10
 
-    
-def listener(in_q) :
-    for line in sys.stdin :
-        in_q.put(line.rstrip('\n'))
 
+
+    
+# def listener(in_q) :
+#     for line in sys.stdin :
+#         in_q.put(line.rstrip('\n'))
+
+#Stole and modified this code from here: https://code.activestate.com/recipes/134892/
+class _GetchUnix:
+    def __init__(self):
+        pass
+
+    def __call__(self, in_q):
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        
+        in_q.put(ch)
     
 
 
@@ -71,7 +86,7 @@ if __name__ == "__main__" :
 
     close_flag = False
 
-    #wipe screen and set cursor to 0,0 
+    #wipe screen and set cursor to 0,0 and turn on bold
     sys.stdout.write("\x1b[2J\x1b[H")
     sys.stdout.write("\x1b[3;7h")
     sys.stdout.write("\x1b[1m")
@@ -79,27 +94,57 @@ if __name__ == "__main__" :
 
     #make one instance of the drop
     instances = []
-    for i in range (60) :
+    for i in range(60) :
         instances.append(Drop())
 
+
     g = Guy()
+    listener = _GetchUnix()
     q = queue.Queue()
-    th = threading.Thread(target=listener, args=(q,), daemon=True)
+    th = threading.Thread(target=listener.__call__, args=(q,), daemon=True)
     th.start()
+    frame_buffer = [[" "]*cols for _ in range(rows)] #needs space to actually clear it
+ 
+
 
     while True:
-        sys.stdout.write("\x1b[2J")
 
-        g.display()
+        #check for user input events
+        if not q.empty() :
+            
+            k = q.get()
+            if k == 'q' :
+                close_flag = True
+            
+            g.move(k)
+                
 
-        while not q.empty() :
-            i = q.get()
-            g.move(i)
 
-        # for i in (instances) :
-        #     i.move()
-        # sys.stdout.flush()
 
+        #clear render buffer
+        for y in range(len(frame_buffer)) :
+            for x in range(len(frame_buffer[y])) :
+                frame_buffer[y][x] = " "
+
+
+        #put all elements of new frame into a frame buffer
+        for i in instances :
+            i.move(frame_buffer)
+        g.display(frame_buffer)
+
+
+        #print the buffer frame
+        for y in range(len(frame_buffer)) :
+            for x in range(len(frame_buffer[y])) :
+                sys.stdout.write(f"\x1b[{y};{x}H" + frame_buffer[y][x])
+
+        #where to write stuff directly to screen
+        sys.stdout.write("\x1b[H" + f"Length of Instances : {len(instances)}")
+
+        #push out frame and pause for a frame
+        sys.stdout.flush()
+        time.sleep(FRAMERATE)
+        
         if(close_flag == True) :
             break
     
