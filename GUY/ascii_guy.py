@@ -3,10 +3,11 @@ import time
 import sys
 import random
 import threading
-import shutil
 import os
 import queue
+from pynput.keyboard import Key, Listener
 import tty, sys, termios
+import curses
 
 
 FRAMERATE = 1/32
@@ -46,54 +47,64 @@ class Guy :
     def __init__(self) :
         self.x = cols//2
         self.y = rows-1
+        self.velX = 0
+        self.velY = 0
+        self.accX = 0
+        self.accY = 0
         self.moveAmt = 1
+        self.maxSpeed = 3
     
     def display(self, buff) :
+        self.velX += self.accX
+        
+        if self.velX >= self.maxSpeed :
+            self.velX = self.maxSpeed
+        elif self.velX <= -self.maxSpeed :
+            self.velX = -self.maxSpeed
+        
+        self.x += self.velX
+
+        if self.x > len(buff[0]) - abs(self.velX) :
+            self.x = 1 + abs(self.velX)
+        elif self.x < abs(self.velX) :
+            self.x = len(buff[0]) - abs(self.velX)
+
         buff[self.y][self.x] = "&"
 
-    def move(self, c: str) :
+
+    def move(self, c: str, buff) :
         if c == 'd' :
-            if self.x < cols - self.moveAmt :
-                self.x = self.x + self.moveAmt
-            else :
-                self.x = 1
+            self.accX += self.moveAmt
         
-        if c == 'a' :
-            if self.x > 0 + self.moveAmt :
-                self.x = self.x - self.moveAmt
+        elif c == 'a' :
+                self.accX -= self.moveAmt
+
+
+
+    def halt(self) :
+        self.accX = 0
+        while self.velX != 0 :
+            if self.velX >= 1 :
+                self.velX -= 1
             else :
-                self.x = cols - self.moveAmt
+                self.velX += 1
 
 
 
 
-
-#Stole and modified this code from here: https://code.activestate.com/recipes/134892/
-def listener(in_q):
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try :
-        while True :
-            tty.setraw(sys.stdin.fileno())
-            ch = sys.stdin.read(1)
-            if not ch :
-                continue
-            in_q.put(ch)
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    
-    
-
-
-if __name__ == "__main__" :
-    print('\x1b[?25l', end="") #hides cursor
+def main(stdscr):
 
     close_flag = False
+    curses.curs_set(0)      # hide cursor
+    stdscr.nodelay(True)    # non-blocking getch
+    stdscr.keypad(True)     # enable arrow keys, etc.
+
 
     #wipe screen and set cursor to 0,0 and turn on bold
     sys.stdout.write("\x1b[2J\x1b[H")
     sys.stdout.write("\x1b[3;7h")
     sys.stdout.write("\x1b[1m")
+    print('\x1b[?25l', end="") #hides cursor
     sys.stdout.flush()
 
     #make one instance of the drop
@@ -103,13 +114,7 @@ if __name__ == "__main__" :
 
 
     g = Guy()
-
-    q = queue.Queue()
-    th = threading.Thread(target=listener, args=(q,), daemon=True)
-    th.start()
     frame_buffer = [[" "]*cols for _ in range(rows)] #needs space to actually clear it
- 
-
 
     while True:
 
@@ -124,28 +129,39 @@ if __name__ == "__main__" :
             i.move(frame_buffer)
         g.display(frame_buffer)
 
+
+        #HUD
         L = f"Length of Instances : {len(instances)}"
         for s, l in zip(L, range(len(L))) :
             frame_buffer[1][l+3] = s
+
+        V = f"Loc : {g.x}   Vel : {g.velX}    Acc : {g.accX}"
+        for s, l in zip(V, range(len(V))) :
+            frame_buffer[4][l+3] = s
+
+
+
+
+        # --- handle input with curses ---
+        ch = stdscr.getch()  # returns -1 if no key pressed
+
+        if ch != -1:  # something pressed
+            if ch == ord('q'):
+                close_flag = True
+            elif ch == ord('a'):
+                g.move('a', frame_buffer)
+            elif ch == ord('d'):
+                g.move('d', frame_buffer)
+        else:
+            g.halt()
+
 
         #print the buffer frame
         for y in range(len(frame_buffer)) :
             for x in range(len(frame_buffer[y])) :
                 sys.stdout.write(f"\x1b[{y};{x}H" + frame_buffer[y][x])
 
-        #where to write stuff directly to screen
-        #sys.stdout.write("\x1b[H" + f"Length of Instances : {len(instances)}")
         
-        #check for user input events
-        if not q.empty() :
-            k = q.get()
-            if k == 'q' :
-                close_flag = True
-            
-            elif k == 'd' or k == 'a' :
-                g.move(k)
-
-
         #push out frame and pause for a frame
         sys.stdout.flush()
         time.sleep(FRAMERATE)
@@ -159,7 +175,8 @@ if __name__ == "__main__" :
 
     
     
-
+if __name__=="__main__" :
+    curses.wrapper(main)
 
 
                 
