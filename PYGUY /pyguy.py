@@ -40,13 +40,14 @@ class Drop :
 class Guy :
     def __init__(self) :
 
-        self.moveAmt = 1
-        self.maxSpeed = 3
-        self.pos = pygame.Vector2(width//2, height-15)
+        self.moveAmt = 0.5
+        self.maxSpeed = 10
+        self.pos = pygame.Vector2(width//2, height-7.5)
         self.vel = pygame.Vector2(0, 0)
         self.acc = pygame.Vector2(0, 0)
+        self.prev_keys = pygame.key.get_pressed()
 
-        self.text_surface = my_font.render('&', True, "green")
+        self.text_surface = my_font.render('&', False, "green")
     
 
     def display(self) :        
@@ -69,23 +70,55 @@ class Guy :
         screen.blit(self.text_surface, text_rect)
 
 
-    def move(self, keys) :
+    def move(self, keys) : #event: pygame.event) :
+        if self.prev_keys != keys :
+            self.acc.x = 0
+            self.vel.x = 0    
+
         if keys[pygame.K_w]:
             pass
         if keys[pygame.K_s]:
             pass
 
         if keys[pygame.K_a]:
-            self.acc.x -= 1
-        if keys[pygame.K_d]:
-            self.acc.x += 1
+            self.acc.x -= self.moveAmt
+        elif keys[pygame.K_d]:
+            self.acc.x += self.moveAmt
+        else :
+            self.acc.x = 0
+            self.vel.x = 0
+
+        self.prev_keys = keys
+
+
+
 
  
 
 
+def apply_scanlines(screen):
+    width, height = screen.get_size()
+    scanline_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+
+    for y in range(0, height, 4):
+        pygame.draw.line(scanline_surface, (0, 0, 0, 60), (0, y), (width, y))
+
+    screen.blit(scanline_surface, (0, 0))
 
 
+def apply_flicker(screen):
+    if random.randint(0, 20) == 0:
+        flicker_surface = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        flicker_surface.fill((255, 255, 255, 5))
+        screen.blit(flicker_surface, (0, 0))
 
+
+def apply_glow(screen):
+    width, height = screen.get_size()
+    glow_surf = pygame.transform.smoothscale(screen, (width // 2, height // 2))
+    glow_surf = pygame.transform.smoothscale(glow_surf, (width, height))
+    glow_surf.set_alpha(50)
+    screen.blit(glow_surf, (0, 0))
 
 
 
@@ -102,7 +135,7 @@ if __name__=="__main__" :
     running = True
     dt = 0
 
-    my_font = pygame.font.SysFont('Arial', 30)
+    my_font = pygame.font.SysFont('SF Mono', 30)
 
     
     rain = [Drop() for _ in range(80)]
@@ -110,11 +143,15 @@ if __name__=="__main__" :
 
 
     while running:
+
+
         # poll for events
         # pygame.QUIT event means the user clicked X to close your window
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
+
 
         # fill the screen with a color to wipe away anything from last frame
         screen.fill("black")
@@ -122,12 +159,14 @@ if __name__=="__main__" :
             drop.display()
             drop.move()
         
-        guy.display()
-        print(guy.pos.x)
 
+        guy.display()
         keys = pygame.key.get_pressed()
         guy.move(keys)
-
+        
+        # apply_flicker(screen)
+        # apply_scanlines(screen)
+        # apply_glow(screen)
 
         # flip() the display to put your work on screen
         pygame.display.flip()
