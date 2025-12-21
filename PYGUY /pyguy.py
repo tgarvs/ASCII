@@ -4,6 +4,7 @@
 import pygame
 import random
 import copy
+import pygame.freetype
 
 
 class Drop :
@@ -42,39 +43,22 @@ class Guy :
 
         self.moveAmt = 0.5
         self.maxSpeed = 10
-        self.pos = pygame.Vector2(width//2, height-7.5)
+        self.pos = pygame.Vector2(width//2, height-10)
         self.vel = pygame.Vector2(0, 0)
         self.acc = pygame.Vector2(0, 0)
         self.prev_keys = pygame.key.get_pressed()
 
-        self.text_surface = my_font.render('&', False, "green")
+        # self.text_surface = my_font.render('&', False, "green")
+        self.text_surface, _ = ft_font.render("&", fgcolor=(0, 255, 0), bgcolor=None)
+
     
-
-    def display(self) :        
-        self.vel.x += self.acc.x
-        
-        if self.vel.x >= self.maxSpeed :
-            self.vel.x = self.maxSpeed
-        elif self.vel.x <= -self.maxSpeed :
-            self.vel.x = -self.maxSpeed
-        
-        self.pos.x += self.vel.x
-
-        if self.pos.x > width - abs(self.vel.x) :
-            self.pos.x = 1 + abs(self.vel.x)
-        elif self.pos.x < abs(self.vel.x) :
-            self.pos.x = width - abs(self.vel.x)
-
-        text_rect = self.text_surface.get_rect()
-        text_rect.center = self.pos
-        screen.blit(self.text_surface, text_rect)
-
-
-    def move(self, keys) : #event: pygame.event) :
+    def input_check(self, keys) :
+        #stop if 
         if self.prev_keys != keys :
             self.acc.x = 0
             self.vel.x = 0    
 
+        #check current keys
         if keys[pygame.K_w]:
             pass
         if keys[pygame.K_s]:
@@ -91,9 +75,35 @@ class Guy :
         self.prev_keys = keys
 
 
+    def display(self) :        
+        text_rect = self.text_surface.get_rect()
+        text_rect.center = self.pos
+        screen.blit(self.text_surface, text_rect)
 
 
- 
+    def move(self, keys) : #event: pygame.event) :
+        self.input_check(keys)
+
+        #actually make it move
+        self.vel.x += self.acc.x
+        
+        #speed check
+        if self.vel.x >= self.maxSpeed :
+            self.vel.x = self.maxSpeed
+        elif self.vel.x <= -self.maxSpeed :
+            self.vel.x = -self.maxSpeed
+        
+        self.pos.x += self.vel.x
+
+        #bounds check
+        if self.pos.x > width - abs(self.vel.x) :
+            self.pos.x = 1 + abs(self.vel.x)
+        elif self.pos.x < abs(self.vel.x) :
+            self.pos.x = width - abs(self.vel.x)
+
+
+
+
 
 
 def apply_scanlines(screen):
@@ -128,6 +138,7 @@ if __name__=="__main__" :
     # pygame setup
     pygame.init()
     pygame.font.init()
+    pygame.freetype.init() 
 
     screen = pygame.display.set_mode((1280, 720))
     width, height = screen.get_size()
@@ -135,7 +146,8 @@ if __name__=="__main__" :
     running = True
     dt = 0
 
-    my_font = pygame.font.SysFont('SF Mono', 30)
+    my_font = pygame.font.SysFont('Arial', 50)
+    ft_font = pygame.freetype.SysFont('Arial', 25) 
 
     
     rain = [Drop() for _ in range(80)]
@@ -143,8 +155,6 @@ if __name__=="__main__" :
 
 
     while running:
-
-
         # poll for events
         # pygame.QUIT event means the user clicked X to close your window
         for event in pygame.event.get():
@@ -152,14 +162,11 @@ if __name__=="__main__" :
                 running = False
 
 
-
         # fill the screen with a color to wipe away anything from last frame
         screen.fill("black")
         for drop in rain :
             drop.display()
             drop.move()
-        
-
         guy.display()
         keys = pygame.key.get_pressed()
         guy.move(keys)
@@ -172,8 +179,6 @@ if __name__=="__main__" :
         pygame.display.flip()
 
         # limits FPS to 60
-        # dt is delta time in seconds since last frame, used for framerate-
-        # independent physics.
         dt = clock.tick(60) / 1000
 
     pygame.quit()
